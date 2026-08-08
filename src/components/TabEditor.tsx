@@ -53,6 +53,15 @@ export default function TabEditor() {
     }));
   };
 
+  const togglePause = () => {
+    const { measure: m, string: s, slot: p } = active;
+    if (!measures[m]?.cells[s][p].fret) return;
+    setMeasures((current) => current.map((measure, mi) => mi !== m ? measure : {
+      ...measure,
+      cells: measure.cells.map((row, si) => si !== s ? row : row.map((cell, pi) => pi === p ? { ...cell, pause: !cell.pause } : cell)),
+    }));
+  };
+
   const handleKey = (event: React.KeyboardEvent<HTMLInputElement>, m: number, s: number, p: number) => {
     if (event.key === "ArrowRight" || event.key === "Tab" && !event.shiftKey) {
       event.preventDefault();
@@ -85,6 +94,14 @@ export default function TabEditor() {
               <span className="note">{duration.symbol}</span><small>{duration.label}</small>
             </button>
           ))}
+          <button
+            className={`pause-button ${measures[active.measure]?.cells[active.string][active.slot].pause ? "selected" : ""}`}
+            onClick={togglePause}
+            disabled={!measures[active.measure]?.cells[active.string][active.slot].fret}
+            title="Manter esta nota soando"
+          >
+            <span className="pause-symbol">⌒</span><small>Nota prolongada</small>
+          </button>
         </div>
         <div className="tempo-control">
           <label htmlFor="tempo">BPM</label>
@@ -125,6 +142,9 @@ export default function TabEditor() {
                           inputMode="numeric"
                           aria-label={`Corda ${name}, posição ${p + 1}`}
                         />
+                        {cell.pause && cell.fret && (
+                          <i className={`pause-arc ${s < 2 ? "pause-arc-up" : "pause-arc-down"}`} aria-hidden="true" />
+                        )}
                       </span>
                     ))}
                     <b className="bar">|</b>
