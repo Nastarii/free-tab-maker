@@ -17,7 +17,7 @@ const newMeasure = (): Measure => ({
   cells: Array.from({ length: 6 }, () =>
     Array.from({ length: SLOTS }, () => ({ fret: "" })),
   ),
-  durations: Array.from({ length: SLOTS }, () => 4 as Duration),
+  durations: Array.from({ length: SLOTS }, () => 1 as Duration),
 });
 
 export default function TabEditor() {
