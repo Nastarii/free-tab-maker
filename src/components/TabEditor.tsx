@@ -158,11 +158,7 @@ export default function TabEditor() {
                       .filter((string) => string >= 0);
                     const hasNotes = stringsWithNotes.length > 0;
                     const previousHasNotes = p > 0 && measure.cells.some((row) => row[p - 1].fret);
-                    const previousDuration = p > 0 ? measure.durations[p - 1] : 1;
-                    const connectionCount = Math.min(
-                      duration === 1 ? 0 : Math.log2(duration),
-                      previousDuration === 1 ? 0 : Math.log2(previousDuration),
-                    );
+                    const connectionCount = duration === 1 ? 0 : Math.log2(duration);
                     return (
                       <span className={`rhythm-slot duration-${duration}`} key={p}>
                         {hasNotes && (
