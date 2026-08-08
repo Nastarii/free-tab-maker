@@ -10,6 +10,7 @@ export type Measure = {
   id: string;
   cells: Cell[][];
   durations: Duration[];
+  chords: string[];
 };
 
 export type Tab = {

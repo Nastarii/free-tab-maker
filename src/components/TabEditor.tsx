@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type CSSProperties } from "react";
-import type { Duration, Measure } from "@/models/tab";
+import type { Duration, Measure, Tab } from "@/models/tab";
 
 const STRINGS = ["e", "B", "G", "D", "A", "E"];
 const SLOTS = 16;
@@ -18,6 +18,7 @@ const newMeasure = (): Measure => ({
     Array.from({ length: SLOTS }, () => ({ fret: "" })),
   ),
   durations: Array.from({ length: SLOTS }, () => 1 as Duration),
+  chords: Array.from({ length: SLOTS }, () => ""),
 });
 
 export default function TabEditor() {
@@ -28,6 +29,7 @@ export default function TabEditor() {
   const [active, setActive] = useState({ measure: 0, string: 0, slot: 0 });
   const [helpOpen, setHelpOpen] = useState(false);
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const importInput = useRef<HTMLInputElement | null>(null);
 
   const focusCell = (measure: number, string: number, slot: number) => {
     const m = Math.max(0, Math.min(measures.length - 1, measure));
@@ -50,6 +52,14 @@ export default function TabEditor() {
     setMeasures((current) => current.map((measure, mi) => mi !== m ? measure : {
       ...measure,
       durations: measure.durations.map((value, pi) => pi === p ? duration : value),
+    }));
+  };
+
+  const updateChord = (m: number, p: number, chord: string) => {
+    if (chord.length > 8) return;
+    setMeasures((current) => current.map((measure, mi) => mi !== m ? measure : {
+      ...measure,
+      chords: measure.chords.map((value, pi) => pi === p ? chord : value),
     }));
   };
 
@@ -97,11 +107,40 @@ export default function TabEditor() {
     setActive({ measure: 0, string: 0, slot: 0 });
   };
 
+  const exportJson = () => {
+    const tab: Tab = { title, artist, tempo, measures };
+    const blob = new Blob([JSON.stringify(tab, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const fileName = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tablatura";
+    link.href = url;
+    link.download = `${fileName}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importJson = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      const data: unknown = JSON.parse(await file.text());
+      if (!isValidTab(data)) throw new Error("Formato inválido");
+      setTitle(data.title);
+      setArtist(data.artist);
+      setTempo(data.tempo);
+      setMeasures(data.measures);
+      setActive({ measure: 0, string: 0, slot: 0 });
+    } catch {
+      window.alert("Não foi possível importar este arquivo. Selecione um JSON exportado pelo editor.");
+    }
+  };
+
   return (
     <>
       <div className="editor-toolbar no-print">
         <div className="duration-group" aria-label="Duração da nota">
-          <span className="duration-title">Duração do tempo selecionado</span>
           {DURATIONS.map((duration) => (
             <button key={duration.value} className={measures[active.measure]?.durations[active.slot] === duration.value ? "selected" : ""} onClick={() => setDuration(duration.value)} title={duration.label}>
               <span className="note">{duration.symbol}</span><small>{duration.label}</small>
@@ -137,6 +176,9 @@ export default function TabEditor() {
           <input id="tempo" type="number" min="30" max="300" value={tempo} onChange={(e) => setTempo(Number(e.target.value))} />
         </div>
         <button className="help-button" onClick={() => setHelpOpen(true)}><span>?</span> Como usar</button>
+        <button className="json-button" onClick={exportJson}>Exportar JSON</button>
+        <button className="json-button" onClick={() => importInput.current?.click()}>Importar JSON</button>
+        <input ref={importInput} className="json-file-input" type="file" accept="application/json,.json" onChange={importJson} />
         <button className="export-button" onClick={() => window.print()}><span>↓</span> Exportar PDF</button>
       </div>
 
@@ -157,6 +199,19 @@ export default function TabEditor() {
                 className="measure"
                 style={{ "--slot-columns": `repeat(${SLOTS}, minmax(28px, 1fr))` } as CSSProperties}
               >
+                <div className="chord-row">
+                  <span /><span />
+                  {measure.chords.map((chord, p) => (
+                    <input
+                      key={p}
+                      value={chord}
+                      onChange={(event) => updateChord(m, p, event.target.value)}
+                      placeholder={p === 0 ? "Em" : ""}
+                      aria-label={`Acorde na posição ${p + 1}`}
+                    />
+                  ))}
+                  <span />
+                </div>
                 {STRINGS.map((name, s) => (
                   <div className="tab-row" key={name}>
                     <span className="string-name">{name}</span><b className="bar">|</b>
@@ -223,18 +278,44 @@ export default function TabEditor() {
             <span className="eyebrow">Guia rápido</span>
             <h2 id="help-title">Como criar sua tablatura</h2>
             <ol>
-              <li><b>Insira notas</b><span>Clique em uma corda e digite uma casa de 0 a 99. Use <strong>x</strong> para uma nota abafada. Notas na mesma coluna formam um acorde.</span></li>
+              <li><b>Insira notas e cifras</b><span>Digite uma casa de 0 a 99 ou <strong>x</strong> para uma nota abafada. Acima das cordas, escreva cifras opcionais como <strong>Em</strong>; deixe as demais posições vazias.</span></li>
               <li><b>Defina a duração</b><span>Escolha Inteira, Meia, 1/4 ou 1/8. A duração vale para toda a coluna; Inteira é o padrão. As hastes abaixo mostram 0, 1, 2 ou 3 barras.</span></li>
               <li><b>Prolongue o som</b><span>Selecione qualquer posição da coluna e clique em <strong>Nota prolongada</strong>. O arco será aplicado a todas as notas existentes nessa coluna.</span></li>
               <li><b>Hammer e Pull</b><span>Selecione uma nota e use <strong>Hammer</strong> para um arco para cima ou <strong>Pull</strong> para um arco para baixo. Clique novamente no botão ativo para remover.</span></li>
               <li><b>Navegue rápido</b><span>Use as setas entre posições e cordas. <kbd>Tab</kbd> avança, <kbd>Shift</kbd> + <kbd>Tab</kbd> volta e <kbd>Enter</kbd> desce uma corda.</span></li>
               <li><b>Organize a música</b><span>Ajuste o BPM no topo e use <strong>Adicionar compasso</strong> ou × para montar a tablatura. Cada compasso possui 16 posições.</span></li>
-              <li><b>Exporte o PDF</b><span>Clique em <strong>Exportar PDF</strong> e escolha “Salvar como PDF”. O arquivo preserva cordas, casas, durações, hastes e arcos.</span></li>
+              <li><b>Salve ou restaure</b><span>Use <strong>Exportar JSON</strong> para salvar todo o projeto e <strong>Importar JSON</strong> para restaurá-lo exatamente como estava.</span></li>
+              <li><b>Exporte o PDF</b><span>Clique em <strong>Exportar PDF</strong> e escolha “Salvar como PDF”. O arquivo preserva cifras, cordas, casas, durações, hastes e arcos.</span></li>
             </ol>
             <button className="help-done" onClick={() => setHelpOpen(false)}>Entendi</button>
           </section>
         </div>
       )}
     </>
+  );
+}
+
+function isValidTab(data: unknown): data is Tab {
+  if (!data || typeof data !== "object") return false;
+  const tab = data as Partial<Tab>;
+  if (typeof tab.title !== "string" || typeof tab.artist !== "string" || typeof tab.tempo !== "number" || !Array.isArray(tab.measures) || tab.measures.length === 0) return false;
+
+  return tab.measures.every((measure) =>
+    measure &&
+    typeof measure.id === "string" &&
+    Array.isArray(measure.durations) &&
+    measure.durations.length === SLOTS &&
+    measure.durations.every((duration) => DURATIONS.some(({ value }) => value === duration)) &&
+    Array.isArray(measure.chords) &&
+    measure.chords.length === SLOTS &&
+    measure.chords.every((chord) => typeof chord === "string") &&
+    Array.isArray(measure.cells) &&
+    measure.cells.length === 6 &&
+    measure.cells.every((row) => Array.isArray(row) && row.length === SLOTS && row.every((cell) =>
+      cell &&
+      typeof cell.fret === "string" &&
+      (cell.pause === undefined || typeof cell.pause === "boolean") &&
+      (cell.technique === undefined || cell.technique === "hammer" || cell.technique === "pull")
+    ))
   );
 }
