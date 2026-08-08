@@ -54,11 +54,24 @@ export default function TabEditor() {
   };
 
   const togglePause = () => {
+    const { measure: m, slot: p } = active;
+    if (!measures[m]?.cells.some((row) => row[p].fret)) return;
+    const shouldAddPause = !measures[m].cells.some((row) => row[p].pause);
+    setMeasures((current) => current.map((measure, mi) => mi !== m ? measure : {
+      ...measure,
+      cells: measure.cells.map((row) => row.map((cell, pi) => pi === p ? { ...cell, pause: shouldAddPause } : cell)),
+    }));
+  };
+
+  const toggleTechnique = (technique: "hammer" | "pull") => {
     const { measure: m, string: s, slot: p } = active;
     if (!measures[m]?.cells[s][p].fret) return;
     setMeasures((current) => current.map((measure, mi) => mi !== m ? measure : {
       ...measure,
-      cells: measure.cells.map((row, si) => si !== s ? row : row.map((cell, pi) => pi === p ? { ...cell, pause: !cell.pause } : cell)),
+      cells: measure.cells.map((row, si) => si !== s ? row : row.map((cell, pi) => pi === p ? {
+        ...cell,
+        technique: cell.technique === technique ? undefined : technique,
+      } : cell)),
     }));
   };
 
@@ -95,12 +108,28 @@ export default function TabEditor() {
             </button>
           ))}
           <button
-            className={`pause-button ${measures[active.measure]?.cells[active.string][active.slot].pause ? "selected" : ""}`}
+            className={`pause-button ${measures[active.measure]?.cells.some((row) => row[active.slot].pause) ? "selected" : ""}`}
             onClick={togglePause}
-            disabled={!measures[active.measure]?.cells[active.string][active.slot].fret}
-            title="Manter esta nota soando"
+            disabled={!measures[active.measure]?.cells.some((row) => row[active.slot].fret)}
+            title="Manter as notas desta coluna soando"
           >
             <span className="pause-symbol">⌒</span><small>Nota prolongada</small>
+          </button>
+          <button
+            className={measures[active.measure]?.cells[active.string][active.slot].technique === "hammer" ? "selected" : ""}
+            onClick={() => toggleTechnique("hammer")}
+            disabled={!measures[active.measure]?.cells[active.string][active.slot].fret}
+            title="Hammer-on na nota selecionada"
+          >
+            <span className="pause-symbol">⌒</span><small>Hammer</small>
+          </button>
+          <button
+            className={measures[active.measure]?.cells[active.string][active.slot].technique === "pull" ? "selected" : ""}
+            onClick={() => toggleTechnique("pull")}
+            disabled={!measures[active.measure]?.cells[active.string][active.slot].fret}
+            title="Pull-off na nota selecionada"
+          >
+            <span className="pause-symbol">⌢</span><small>Pull</small>
           </button>
         </div>
         <div className="tempo-control">
@@ -144,6 +173,9 @@ export default function TabEditor() {
                         />
                         {cell.pause && cell.fret && (
                           <i className={`pause-arc ${s < 2 ? "pause-arc-up" : "pause-arc-down"}`} aria-hidden="true" />
+                        )}
+                        {cell.technique && cell.fret && (
+                          <i className={`pause-arc technique-arc ${cell.technique === "hammer" ? "pause-arc-up" : "pause-arc-down"}`} aria-hidden="true" />
                         )}
                       </span>
                     ))}
@@ -191,10 +223,13 @@ export default function TabEditor() {
             <span className="eyebrow">Guia rápido</span>
             <h2 id="help-title">Como criar sua tablatura</h2>
             <ol>
-              <li><b>Insira uma nota</b><span>Clique sobre uma linha e digite o número da casa, de 0 a 99. Digite <strong>x</strong> para uma nota abafada.</span></li>
-              <li><b>Escolha a duração</b><span>Selecione uma posição e escolha Inteira, Meia, 1/4 ou 1/8. A duração vale para todas as cordas naquela coluna.</span></li>
-              <li><b>Navegue rapidamente</b><span>Use as setas entre posições e cordas. <kbd>Tab</kbd> avança e <kbd>Enter</kbd> desce para a próxima corda.</span></li>
-              <li><b>Monte e exporte</b><span>Adicione quantos compassos precisar. Ao terminar, clique em Exportar PDF e escolha “Salvar como PDF”.</span></li>
+              <li><b>Insira notas</b><span>Clique em uma corda e digite uma casa de 0 a 99. Use <strong>x</strong> para uma nota abafada. Notas na mesma coluna formam um acorde.</span></li>
+              <li><b>Defina a duração</b><span>Escolha Inteira, Meia, 1/4 ou 1/8. A duração vale para toda a coluna; Inteira é o padrão. As hastes abaixo mostram 0, 1, 2 ou 3 barras.</span></li>
+              <li><b>Prolongue o som</b><span>Selecione qualquer posição da coluna e clique em <strong>Nota prolongada</strong>. O arco será aplicado a todas as notas existentes nessa coluna.</span></li>
+              <li><b>Hammer e Pull</b><span>Selecione uma nota e use <strong>Hammer</strong> para um arco para cima ou <strong>Pull</strong> para um arco para baixo. Clique novamente no botão ativo para remover.</span></li>
+              <li><b>Navegue rápido</b><span>Use as setas entre posições e cordas. <kbd>Tab</kbd> avança, <kbd>Shift</kbd> + <kbd>Tab</kbd> volta e <kbd>Enter</kbd> desce uma corda.</span></li>
+              <li><b>Organize a música</b><span>Ajuste o BPM no topo e use <strong>Adicionar compasso</strong> ou × para montar a tablatura. Cada compasso possui 16 posições.</span></li>
+              <li><b>Exporte o PDF</b><span>Clique em <strong>Exportar PDF</strong> e escolha “Salvar como PDF”. O arquivo preserva cordas, casas, durações, hastes e arcos.</span></li>
             </ol>
             <button className="help-done" onClick={() => setHelpOpen(false)}>Entendi</button>
           </section>
